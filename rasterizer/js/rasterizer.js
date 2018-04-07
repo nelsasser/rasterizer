@@ -209,6 +209,44 @@ function mult1x4by4x4(m1x4, m4x4) {
 /**
  *      CODE FOR BASIC RASTERIZATION
  */
+function Window3d(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+}
+
+Window3d.prototype.clearScreen = function(color) {
+    this.ctx.beginPath();
+    this.ctx.rect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.fillStyle = color;
+    this.ctx.fill();
+}
+
+Window3d.prototype.rasterizeTriangle = function(triangle, color, drawBoundingBox) {
+    //get the bounding box for our projected triangle
+    //this reduces the computational overhead by reducing the number of points we have to loop through
+    var bound = Triangle.getBoundingRect(triangle.a.matrix,
+                                         triangle.b.matrix,
+                                         triangle.c.matrix);
+
+    //go through every point in the bounding box to see if it is inside of the triangle
+    for(var x = bound.points[0]; x < bound.points[2]; x++) {
+        for(var y = bound.points[1]; y < bound.points[3]; y++) {
+            if(drawBoundingBox) {
+                this.ctx.beginPath();
+                this.ctx.rect(bound.points[0], bound.points[1], bound.points[2] - bound.points[0], bound.points[3] - bound.points[1]);
+                this.ctx.fillStyle = 'blue';
+                this.ctx.fill();
+            }
+            if(isPointInTriangle(x, y, triangle)) {
+                this.ctx.beginPath();
+                this.ctx.rect(x, y, 1, 1);
+                this.ctx.fillStyle = color;
+                this.ctx.fill();
+            }
+        }
+    }
+}
+
 function isPointInTriangle(x, y, tri) {
     let poly = tri.getMatrices();
     let num = 3;
