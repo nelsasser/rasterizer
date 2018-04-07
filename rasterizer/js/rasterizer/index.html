@@ -1,0 +1,82 @@
+<html>
+    <head>
+        <title>Simple Rasterizer</title>
+        <script src="js/rasterizer.js" type="text/javascript"></script>
+        <link rel="stylesheet" type="text/css" href="style.css"></style>
+    </head>
+    <body>
+        <canvas id="canvas" width="1000px" height="1000px"></canvas>
+        <div class="ui">
+                <label class="switch">
+                    <input type="checkbox" id="toggle_rotation">
+                    <span class="slider round"></span>
+                    <a>Rotation</a>
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="toggle_box">
+                    <span class="slider round"></span>
+                    <a>Draw Bounding Box</a>
+                </label>
+            </div>
+        <script>
+            const WIDTH = 1000;
+            const HEIGHT = 1000;
+
+            //set up our 3d viewer
+            var canvas = document.getElementById('canvas');
+            var view = new Window3d(canvas);
+            view.clearScreen("black");
+            
+            //create our base triangle
+            var triangle = new Triangle(new Mat1x4([1, 1, 0, 1]),
+                                        new Mat1x4([0, 1, 0, 1]),
+                                        new Mat1x4([1, 0, 0, 1]
+                                        ));
+
+            //create our translation matrix
+            var translationMatrix = new Mat1x4([8, 8, 0, 0]);
+            //translate the triangle
+            triangle.translate(translationMatrix);
+
+            var last = 0;
+            var rotation = 0;
+            var rotSpeed = .1;
+            draw();
+
+            function draw(time) {
+                //get elapsed time for the frame
+                if(!time) time = 0;
+                var elapsedTime = (time - last) / 1000;
+                last = time;
+
+                //rotate triangle
+                if(document.getElementById("toggle_rotation").checked == true) {
+                    triangle.rotate('xyz', [rotation, Math.sin(rotation / 3), rotation]);
+                    rotSpeed = .001;
+                } else {
+                    rotation = 0;
+                    rotSpeed = 0;
+                }
+
+
+                //create our projection matrix
+                var projectionMatrix = Mat4x4.createProjectionMatrix('perspective', 0.1, 1.5, 90);
+
+
+                //project our triangle using the projection matrix
+                var projectedTriangle = new Triangle(   mult1x4by4x4(triangle.a, projectionMatrix),
+                                                        mult1x4by4x4(triangle.b, projectionMatrix),
+                                                        mult1x4by4x4(triangle.c, projectionMatrix)
+                                                    );
+
+                view.clearScreen("black");
+                view.rasterizeTriangle(projectedTriangle, "pink", document.getElementById("toggle_box").checked);
+
+                window.requestAnimationFrame(draw);
+
+                //increment our rotation
+                rotation += (rotSpeed * elapsedTime) % 360;
+            }
+        </script>
+    </body>
+</html>
