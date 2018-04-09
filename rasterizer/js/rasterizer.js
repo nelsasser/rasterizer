@@ -154,6 +154,31 @@ Triangle.prototype.getDepth = function() {
 }
 
 /**
+ * Determines if one triangle is 100% obstructed by this triangle.
+ * 
+ * Does not take the depths of the triangles into account, only their x, y positions.
+ * Actual obstruction should be tested by first sorting the triangles according to their depth.
+ *
+ * @param {*} tri 
+ * triangle to be tested if it is covered
+ * 
+ * @returns
+ * true if this triangle is covering other triangle
+ * false if this triangle is not covering other triangle
+ */
+Triangle.prototype.isCoveringTriangle = function(tri) {
+    //get all points from other triangle
+    var x1 = tri.a.matrix[0];
+    var x2 = tri.b.matrix[0];
+    var x3 = tri.c.matrix[0];
+    var y1 = tri.a.matrix[1];
+    var y2 = tri.b.matrix[1];
+    var y3 = tri.c.matrix[1];
+
+    return isPointInTriangle(x1, y1, this) && isPointInTriangle(x2, y2, this) && isPointInTriangle(x3, y3, this);
+}
+
+/**
  * 
  * Creates a rectangle given furthest left X, top most Y, width, and height.
  * Top left values are truncated and bottom right values are rounded.
@@ -576,7 +601,8 @@ Window3d.prototype.getRasterArray = function(tri) {
  * triangle to check
  * 
  * @returns
- * boolean on if point is in triangle
+ * true if point is in triangle
+ * false if point is outside of triangle
  * 
  */
 function isPointInTriangle(x, y, tri) {
