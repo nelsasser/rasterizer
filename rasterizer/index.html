@@ -28,9 +28,9 @@
             view.clearScreen("black");
             
             //create our base triangle
-            var triangle = new Triangle(new Mat1x4([1, 1, 0, 1]),
-                                        new Mat1x4([0, 1, 0, 1]),
-                                        new Mat1x4([1, 0, 0, 1]
+            var triangle = new Triangle(new Mat1x4([3, 3, 0, 1]),
+                                        new Mat1x4([0, 3, 0, 1]),
+                                        new Mat1x4([3, 0, 0, 1]
                                         ));
 
             //create our translation matrix
@@ -41,6 +41,8 @@
             var last = 0;
             var rotation = 0;
             var rotSpeed = .1;
+
+            var tM = new Mat1x4([.001, .001, 0, 0]);
             draw();
 
             function draw(time) {
@@ -49,10 +51,13 @@
                 var elapsedTime = (time - last) / 1000;
                 last = time;
 
+                //translate
+                triangle.translate(tM);
+
                 //rotate triangle
                 if(document.getElementById("toggle_rotation").checked == true) {
                     triangle.rotate('xyz', [rotation, Math.sin(rotation / 3), rotation]);
-                    rotSpeed = .001;
+                    rotSpeed = .05;
                 } else {
                     rotation = 0;
                     rotSpeed = 0;
@@ -60,7 +65,7 @@
 
 
                 //create our projection matrix
-                var projectionMatrix = Mat4x4.createProjectionMatrix('perspective', 0.1, 1.5, 90);
+                var projectionMatrix = Mat4x4.createProjectionMatrix(0.1, 1.5, 90);
 
 
                 //project our triangle using the projection matrix
@@ -70,7 +75,9 @@
                                                     );
 
                 view.clearScreen("black");
-                view.rasterizeTriangle(projectedTriangle, "pink", document.getElementById("toggle_box").checked);
+                rasterArray = getRasterArray(projectedTriangle);
+                view.drawRasterArray(rasterArray, "pink");
+                
 
                 window.requestAnimationFrame(draw);
 
