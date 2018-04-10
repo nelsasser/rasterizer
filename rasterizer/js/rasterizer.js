@@ -200,6 +200,87 @@ function Rectangle(x, y, width, height) {
     this.points = [Math.trunc(x), Math.trunc(y), Math.round(x + width), Math.round(y + height)];
 }
 
+/**
+ * A container of many triangles used to form a larger 3d object
+ * 
+ * @param {*} mesh 
+ * The list of triangle objects that form the mesh
+ */
+function Mesh(mesh) {
+    this.mesh = [];
+}
+
+/**
+ * Sorts all of the triangles in the mesh by their depth.
+ * The closests triangles are in the front, the furthest are in the back.
+ */
+Mesh.prototype.sortByDepth = function() {
+    this.mesh.sort(function(t1, t2) {
+        return t1.getDepth() - t2.getDepth();
+    });
+}
+
+/**
+ * Sorts the triangles in the mesh by depth. 
+ * Then returns a list of all of the visible triangles in a mesh.
+ * 
+ * @returns
+ * An array of all visible triangles in the mesh.
+ */
+Mesh.prototype.cullTriangles = function() {
+    //first sort by depth, so closer triangles are at the front
+    this.sortByDepth();
+
+    var visibleTriangles = [];
+    var culledTriangles = {};
+    
+    //this loops through all of the visible triangles
+    for(var t = 0; t < this.mesh.length; t++) {
+        //checks if the culling triangle is already culled
+        if(culledTriangles[t] === undefined) {
+            //this loops through all of the triangles behind the culling one
+            for(var i = t + 1; i < this.mesh.length; i++) {
+                //checks to see if this triangle has already been culled
+                if(culledTriangles[i] === undefined) {
+                    //checks to see if it is being culled by the culling triangle
+                    if(this.mesh[t].isCoveringTriangle(this.mesh[i])) {
+                        //if it is, add it to the culled hash
+                        culledTriangles[i] = this.mesh[i];
+                    }
+                }
+
+                //if it is not already culled, or getting culled, do nothing to it and carry on
+            }
+
+            //if our culling triangle has not already been culled
+            //we can go ahead and add it to the visible triangle array
+            visibleTriangles.push(this.mesh[t]);
+        }
+    }
+
+    return visibleTriangles;
+}
+
+/**
+ * Returns the an array of raster data for a given mesh
+ * 
+ * @param {*} mesh 
+ * Array of triangles to get raster data for
+ * 
+ * @returns
+ * An array of raster arrays, on for each triangle in the mesh.
+ */
+Mesh.getRasterData = function(mesh) {
+    //array of raster arrays
+    var data = [];
+
+    //loop through each triangle in the mesh
+    for(tri in mesh) {
+        data.push(getRasterArray(tri));
+    }
+
+    return data;
+}
 
 /**
  *      BASIC MATRIX CREATION AND EDITING
@@ -492,12 +573,98 @@ Window3d.prototype.clearScreen = function(color) {
 /**
  * TO BE IMPLEMENTED
  * @param {*} array 
+ * the raster array to be drawn
+ * 
  * @param {*} color 
- * @param {*} drawBoundingBox 
+ * the color to draw the raster data
+ * 
  */
 Window3d.prototype.drawRasterArray = function(array, color) {
-    //go through every point in the bounding box to see if it is inside of the triangle
+    //array of bytes
+    var bytes = array.bytes;
+
+    //how many points to draw
+    var length = array.boxSize;
+
+    //bounds to draw in
+    var startX = array.bound.points[0];
+    var startY = array.bound.points[1];
+    var endX = array.bound.points[2];
+    var endY = array.bound.points[3];
+
+    //index for the byte in the array
+    var index = 0;
+
+    //which bit we are at
+    //since we stored them going in from the right, shifting left
+    //we want to extract them again in the same order by shifting left again
+    //so we want to count down our bits
+    //we could still count up but counting down makes more conceptual sense
+    var bit = 7;
     
+    //mask we will use to extract bit
+    //10000000
+    var mask = 0x80;
+
+    //loop through every point in bounding rect
+    for(var x = startX; x < endX; x++) {
+        for(var y = startY; y < endY; y++) {
+
+            var byte = bytes[index];
+            //check if our extracted byte
+            //using the mask, lookes like the mask
+            if(byte & mask == mask) {
+                //if it does, then that bit was a 1 so we fill the point
+                this.ctx.beginPath();
+                this.ctx.rect(x, y, 1, 1);
+                this.ctx.fillStyle = color;
+                this.ctx.fill();
+            }/* else {
+                this.ctx.beginPath();
+                this.ctx.rect(x, y, 1, 1);
+                this.ctx.fillStyle = "cornflowerblue"
+                this.ctx.fill();
+            }*/
+
+            //shift the bits over one spot
+            byte = byte << 1;
+
+            //decrease our bit counter
+            bit--;
+
+            //increment to next byte when we run out of bits
+            if(bit < 0) {
+                bit = 7;
+                index++;
+            }
+        }
+    }
+}
+
+/**
+ * Draws the mesh all as one color. Culls all unseen triangles.
+ * 
+ * @param {*} mesh 
+ * the mesh to be drawn
+ * 
+ * @param {*} color 
+ * The color to draw the mesh
+ * 
+ */
+Window3d.prototype.drawMeshAsColor = function(mesh, color) {
+    //sort triangles by depth
+    //and get only the visible triangles
+    var drawMesh = this.cullTriangles();
+
+    //get all of the raster data for the visible mesh
+    var rasterData = Mesh.getRasterData(mesh);
+
+    //since the triangles in the mesh are listed from closest at the front
+    //to furthest at the back, we need to loop through the mesh backwards to make sure we
+    //don't have the back triangles drawing over the front triangles
+    for(var i = rasterData.length - 1; i >= 0; i--) {
+        this.drawRasterArray(rasterData[i], color);
+    }
 }
 
 /**
@@ -526,13 +693,13 @@ Window3d.prototype.drawRasterArray = function(array, color) {
  * bound -> the bounding rectangle for the triangle.
  * 
  */
-Window3d.prototype.getRasterArray = function(tri) {
+function getRasterArray(tri) {
     //get the bounding box of the rectangle
     var bound = tri.getBoundingRect(); 
 
     //each point in the box will be a bit that we store as 1 or 0
     //so we need to know haw many bits we will store.
-    var boxSize = bound.points[2] - bound.points[0] * bound.points[3] - bound.points[1];
+    var boxSize = (bound.points[2] - bound.points[0]) * (bound.points[3] - bound.points[1]);
 
     //find length to make byte array
     var size = (boxSize - (boxSize % 8)) / 8;   //how many "bytes" our bounding box takes up
@@ -541,7 +708,7 @@ Window3d.prototype.getRasterArray = function(tri) {
     }
 
     //create a new array of bytes to store our data
-    var arr = new Uint8Array(size);
+    var bytes = new Uint8Array(size);
 
     //initial index we are starting at
     var index = 0;
@@ -552,7 +719,7 @@ Window3d.prototype.getRasterArray = function(tri) {
     for(var x = bound.points[0]; x < bound.points[2]; x++) {
         for(var y = bound.points[1]; y < bound.points[3]; y++) {
             //get byte specified index in the array
-            var byte = arr[index];
+            var byte = bytes[index];
 
             //shift all bits over by one so we can insert new value
             byte = byte << 1;
@@ -565,7 +732,7 @@ Window3d.prototype.getRasterArray = function(tri) {
             }
 
             //set the byte at the index to our new byte
-            arr[index] = byte;
+            bytes[index] = byte;
 
             //increase what bit we are at
             bit++
@@ -583,7 +750,7 @@ Window3d.prototype.getRasterArray = function(tri) {
     //return the array of bytes,
     //the number of bits that we are using to store the data, aka boxSize,
     //and the actual bounding box for the triangle.
-    return {arr, size, boxSize, bound}
+    return {bytes, size, boxSize, bound}
 }
 
 /**
